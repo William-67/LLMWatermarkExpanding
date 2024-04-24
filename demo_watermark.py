@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os
 import argparse
 from argparse import Namespace
@@ -380,6 +381,7 @@ def generate_with_low_entropy(prompt, args, tokenizer, model=None, device=None):
         generated_text_without_watermark, generated_text = "",""
         generated_token, generated_token_without = "",""
         count = 0
+        entropy = 0
         for i in range(max_new_tokens):
 
             if not with_stop:
@@ -396,6 +398,11 @@ def generate_with_low_entropy(prompt, args, tokenizer, model=None, device=None):
 
                 # Sample the next token
                 next_token = torch.multinomial(probabilities, num_samples=1)
+                next_token_probability = probabilities[0, next_token.item()]
+
+                # print(next_token_probability)
+                entropy += math.log2(next_token_probability)
+
                 input_ids = torch.cat([input_ids, next_token], dim=-1)
 
                 # Update input_ids for the next iteration
@@ -427,6 +434,7 @@ def generate_with_low_entropy(prompt, args, tokenizer, model=None, device=None):
                         if distribution_comparision(tmp_input_ids, next_token, model,divergence_threshold=args.divergence_threshold):
                             # Sample the next token
                             # next_single_token = torch.multinomial(single_probabilities, num_samples=1)
+                            entropy += math.log2(max_single_prob)
                             input_ids = torch.cat([input_ids, next_token], dim=-1)
                             generated_token = torch.cat([generated_token,next_token], dim=-1)
                             count += 1
@@ -463,6 +471,9 @@ def generate_with_low_entropy(prompt, args, tokenizer, model=None, device=None):
             if with_stop and without_stop:
                 break
         
+        perplexity = math.exp((-1/count) * entropy)
+        print("the perplexity of the text are: ")
+        print(perplexity)
         generated_text = tokenizer.batch_decode(generated_token, skip_special_tokens=True)[0]
         generated_text_without_watermark = tokenizer.batch_decode(generated_token_without, skip_special_tokens=True)[0]
         all_without_words, all_with_words = "", ""
